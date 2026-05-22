@@ -39,6 +39,7 @@ TRIBUNAL = "STJ"
 
 OUTPUT_FILE = Path(__file__).parent / "index.html"
 SEEN_FILE = Path(__file__).parent / "seen.json"
+FULLTEXT_FILE = Path(__file__).parent / "decisoes-completas.txt"
 
 QUERY_DAYS = 4           # busca: rede de segurança contra execução pulada/fim de semana
 DISPLAY_DAYS = 1         # exibe hoje + ontem (cutoff = hoje - DISPLAY_DAYS)
@@ -366,6 +367,39 @@ def render_html(display: list[dict], new_ids: set, now: datetime.datetime,
 </html>"""
 
 
+def write_fulltext(display: list[dict], now: datetime.datetime) -> None:
+    """Salva o INTEIRO TEOR das decisoes exibidas num unico arquivo .txt
+    (sobrescrito a cada execucao) para analise no chat do Claude."""
+    out = [
+        "DECISOES TRIBUTARIAS DO STJ - INTEIRO TEOR",
+        f"Gerado em {now:%d/%m/%Y %H:%M} | {len(display)} decisoes (hoje + ontem)",
+        "Fonte: DJEN. Suba este arquivo no chat do Claude e faca perguntas "
+        "analiticas (ex: tese, se o contribuinte venceu ou perdeu).",
+        "",
+    ]
+    for k in display:
+        it = k["it"]
+        proc = it.get("numeroprocessocommascara") or it.get("numero_processo") or "?"
+        classe = it.get("nomeClasse") or "Decisao"
+        orgao = it.get("nomeOrgao") or ""
+        link = it.get("link") or ""
+        dests = it.get("destinatarios") or []
+        partes = "; ".join(x.get("nome", "") for x in dests if x.get("nome"))
+        out.append("=" * 70)
+        out.append(f"{k['date']:%d/%m/%Y} | {classe} | {proc}")
+        out.append(f"Tributos: {', '.join(k['terms'])}")
+        if orgao:
+            out.append(f"Orgao: {orgao}")
+        if partes:
+            out.append(f"Partes: {partes}")
+        if link:
+            out.append(f"Link: {link}")
+        out.append("-" * 70)
+        out.append(k["text"])
+        out.append("")
+    FULLTEXT_FILE.write_text("\n".join(out), encoding="utf-8")
+
+
 def main() -> None:
     today = datetime.date.today()
     if len(sys.argv) > 1:
@@ -413,6 +447,9 @@ def main() -> None:
     OUTPUT_FILE.write_text(render_html(display, new_ids, now, latest),
                            encoding="utf-8")
     print(f"HTML salvo: {OUTPUT_FILE} ({len(display)} decisões exibidas)")
+
+    write_fulltext(display, now)
+    print(f"Inteiro teor salvo: {FULLTEXT_FILE}")
 
     for k in kept:
         seen[str(k["id"])] = k["date"].isoformat()
