@@ -12,6 +12,7 @@ Estratégia (igual ao robô do CARF):
 
 from __future__ import annotations
 
+import base64
 import datetime
 import html
 import json
@@ -40,6 +41,8 @@ TRIBUNAL = "STJ"
 OUTPUT_FILE = Path(__file__).parent / "index.html"
 SEEN_FILE = Path(__file__).parent / "seen.json"
 FULLTEXT_FILE = Path(__file__).parent / "decisoes-completas.txt"
+TOKEN_FILE = Path(__file__).parent / "github_token.txt"
+GITHUB_REPO = "ughoac-lab/stj-monitor"
 
 QUERY_DAYS = 4           # busca: rede de segurança contra execução pulada/fim de semana
 DISPLAY_DAYS = 1         # exibe hoje + ontem (cutoff = hoje - DISPLAY_DAYS)
@@ -400,6 +403,39 @@ def write_fulltext(display: list[dict], now: datetime.datetime) -> None:
     FULLTEXT_FILE.write_text("\n".join(out), encoding="utf-8")
 
 
+def publish_to_github(html_text: str) -> None:
+    """Se existir github_token.txt, envia o index.html para o GitHub via API
+    (sem precisar de Git). O GitHub Pages serve a pagina publicamente.
+    Sem o arquivo de token (ex: rodando no PC de casa), nao publica."""
+    if not TOKEN_FILE.exists():
+        return
+    token = TOKEN_FILE.read_text(encoding="utf-8").strip()
+    if not token:
+        return
+    api = f"https://api.github.com/repos/{GITHUB_REPO}/contents/index.html"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+    try:
+        r = requests.get(api, headers=headers, timeout=30)
+        sha = r.json().get("sha") if r.status_code == 200 else None
+        payload = {
+            "message": f"Atualiza pagina STJ {datetime.date.today().isoformat()}",
+            "content": base64.b64encode(html_text.encode("utf-8")).decode("ascii"),
+        }
+        if sha:
+            payload["sha"] = sha
+        r = requests.put(api, headers=headers, json=payload, timeout=30)
+        if r.status_code in (200, 201):
+            print("Publicado no GitHub Pages com sucesso.")
+        else:
+            print(f"Falha ao publicar no GitHub: HTTP {r.status_code} - {r.text[:200]}")
+    except Exception as e:
+        print(f"Erro ao publicar no GitHub: {e}")
+
+
 def main() -> None:
     today = datetime.date.today()
     if len(sys.argv) > 1:
@@ -444,9 +480,10 @@ def main() -> None:
 
     latest = max((k["date"] for k in kept), default=None)
     now = datetime.datetime.now()
-    OUTPUT_FILE.write_text(render_html(display, new_ids, now, latest),
-                           encoding="utf-8")
+    html_text = render_html(display, new_ids, now, latest)
+    OUTPUT_FILE.write_text(html_text, encoding="utf-8")
     print(f"HTML salvo: {OUTPUT_FILE} ({len(display)} decisões exibidas)")
+    publish_to_github(html_text)
 
     write_fulltext(display, now)
     print(f"Inteiro teor salvo: {FULLTEXT_FILE}")
