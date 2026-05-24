@@ -176,7 +176,9 @@ CSS = """
     body { font-family: -apple-system, system-ui, Segoe UI, sans-serif;
            max-width: 1150px; margin: 2em auto; padding: 0 1em;
            color: #222; line-height: 1.5; }
-    h1 { border-bottom: 2px solid #155; padding-bottom: 0.3em; margin-bottom: 0.3em; }
+    h1 { border-bottom: 2px solid #155; padding-bottom: 0.3em; margin-bottom: 0.2em; }
+    .topo { font-size: 0.9em; margin: 0.3em 0 0.8em; }
+    .topo a { color: #0a6b3b; }
     .status { background: #f6f8fa; border: 1px solid #e1e4e8; border-radius: 6px;
               padding: 0.7em 1em; margin: 0.8em 0; font-size: 0.92em; color: #444; }
     .status div { margin: 0.15em 0; }
@@ -353,6 +355,7 @@ def render_html(display: list[dict], new_ids: set, now: datetime.datetime,
 </head>
 <body>
   <h1>Decisões Tributárias — STJ</h1>
+  <div class="topo">→ <a href="https://ughoac-lab.github.io/stj-acordaos-mensal/">Ver acórdãos do mês (decisões colegiadas)</a></div>
   <div class="status">
     <div>🤖 Robô executou em <b>{now_str}</b> (se for hoje, está funcionando).</div>
     <div>📅 Publicação mais recente encontrada: <b>{latest_str}</b>.</div>
